@@ -1,0 +1,27 @@
+name: IRONFIST Windows VST3
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -A x64
+      - name: Compile
+        run: cmake --build build --config Release --target Ironfist_VST3 --parallel 4
+      - name: Verify bundle
+        shell: pwsh
+        run: |
+          $p = Get-ChildItem build -Recurse -Filter IRONFIST.vst3 | Where-Object { $_.PSIsContainer } | Select-Object -First 1
+          if (!$p) { throw "VST3 bundle missing" }
+          if (!(Test-Path "$($p.FullName)/Contents/x86_64-win/IRONFIST.vst3")) { throw "VST3 binary missing" }
+          New-Item -ItemType Directory -Force dist
+          Copy-Item $p.FullName dist -Recurse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IRONFIST-0.1-Windows-x64-VST3
+          path: dist/
+          if-no-files-found: error
