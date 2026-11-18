@@ -46,19 +46,19 @@ struct Channel{
 struct Verb{
  std::array<Ring,8> line;
  std::array<Filter,8> damp;
- float gate=0;
+ float gate=0; std::array<float,8> delays{},feedbackGain{}; float damping=.2f,gateRelease=.9995f;
  double sampleRate=44100;
  const std::array<float,8> times={29.7f,37.1f,41.9f,47.3f,53.9f,61.7f,67.9f,73.1f};
  void prepare(double sr){sampleRate=sr;for(int i=0;i<8;++i){line[i].prepare(int(sr*.18)+8);damp[i]={};}gate=0;}
- void tick(float l,float r,int type,float decay,float brightness,float& outL,float& outR){
- float scale=type==1?.72f:type==2?1.35f:type==3?.85f:type==4?.43f:.82f;
- float d=0.04f+brightness*.36f,read[8]{},filtered[8]{},sum=0;
- for(int i=0;i<8;++i){read[i]=line[i].read(times[i]*scale*.001f*float(sampleRate));filtered[i]=damp[i].lp(read[i],d);sum+=filtered[i];}
+ void configure(int type,float decay,float brightness){float scale=type==1?.72f:type==2?1.35f:type==3?.85f:type==4?.43f:.82f;damping=0.04f+brightness*.36f;gateRelease=std::exp(-1.f/(float(sampleRate)*.045f));for(int i=0;i<8;++i){delays[i]=times[i]*scale*.001f*float(sampleRate);feedbackGain[i]=std::pow(.001f,times[i]*scale*.001f/std::max(.2f,decay));}}
+ void tick(float l,float r,int type,float& outL,float& outR){
+ float d=damping,read[8]{},filtered[8]{},sum=0;
+ for(int i=0;i<8;++i){read[i]=line[i].read(delays[i]);filtered[i]=damp[i].lp(read[i],d);sum+=filtered[i];}
  float mid=(l+r)*.5f,side=(l-r)*.5f;
- for(int i=0;i<8;++i){float fb=std::pow(.001f,times[i]*scale*.001f/std::max(.2f,decay));float input=(i%2? -mid:mid)+(i%4<2?side:-side)*.6f;if(type==0)input=0;line[i].write(input*.24f+fb*(filtered[i]-sum*.25f));}
+ for(int i=0;i<8;++i){float fb=feedbackGain[i];float input=(i%2? -mid:mid)+(i%4<2?side:-side)*.6f;if(type==0)input=0;line[i].write(input*.24f+fb*(filtered[i]-sum*.25f));}
  outL=(read[0]+read[2]-read[4]+read[6])*.42f;outR=(read[1]-read[3]+read[5]+read[7])*.42f;
  if(type==3){outL=.8f*outL+.2f*read[4];outR=.8f*outR-.2f*read[5];}
- float key=std::max(std::abs(l),std::abs(r));gate=std::max(key,gate*.9995f);
+ float key=std::max(std::abs(l),std::abs(r));gate=std::max(key,gate*gateRelease);
  if(type==5){float g=std::clamp(gate*45.f,0.f,1.f);outL*=g;outR*=g;}if(type==0)outL=outR=0;
  }
 };
@@ -90,11 +90,11 @@ public:
  float smpl=float(sr),rate=v[1],depth=v[2]*.01f,mm=v[3]*.01f,regen=v[4]*.01f,fb=v[7]*.01f,dm=v[8]*.01f,rm=v[12]*.01f,color=v[15]*.01f,width=v[16]*.01f,mix=v[17]*.01f;
  float delayTargetL=v[5]*(sync?120.f/bpm:1.f),delayTargetR=v[6]*(sync?120.f/bpm:1.f);
  float hp=1-std::exp(-2*pi*v[13]/smpl),lp=1-std::exp(-2*pi*std::min(v[14],smpl*.45f)/smpl),echoLP=1-std::exp(-2*pi*(10000.f-color*6500.f)/smpl),echoHP=1-std::exp(-2*pi*100.f/smpl);
- float maxPeak=0;
+ verb.configure(reverb,v[10],1-color*.65f);float timeSmooth=1-std::exp(-1.f/(smpl*.045f));float maxPeak=0;
  for(int i=0;i<n;++i){
  float dry[2]={b.getSample(0,i),b.getSample(inCh>1?1:0,i)},modOut[2]{},echo[2]{},verbIn[2]{},wet[2]{};
  phase+=rate/smpl;if(phase>=1)phase-=1;
- float timeSmooth=1-std::exp(-1.f/(smpl*.045f));delayL+=timeSmooth*(delayTargetL-delayL);delayR+=timeSmooth*(delayTargetR-delayR);
+ delayL+=timeSmooth*(delayTargetL-delayL);delayR+=timeSmooth*(delayTargetR-delayR);
  for(int c=0;c<2;++c){
  auto& z=state[c];float x=dry[c],p0=2*pi*(phase+(c?.25f:0)),lfo=std::sin(p0);float y=x;
  if(mod==1||mod==2||mod==4||mod==7){
@@ -121,7 +121,7 @@ public:
  z.delay.write(sat(modSignal+fb*feedback,color));
  float send=modSignal+dm*echo[c]*.65f;float pd=v[11]*.001f*smpl;verbIn[c]=pd<1?send:z.pre.read(pd);z.pre.write(send);
  }
- float vl=0,vr=0;verb.tick(verbIn[0],verbIn[1],reverb,v[10],1-color*.65f,vl,vr);
+ float vl=0,vr=0;verb.tick(verbIn[0],verbIn[1],reverb,vl,vr);
  float verbs[2]={vl,vr};float directGain=mod==0?1:1-mm;float a=aux.getNextValue();float master=mix+(1-mix)*a;
  for(int c=0;c<2;++c){auto& z=state[c];float w=mm*modOut[c]+dm*echo[c]+rm*verbs[c];w=sat(w,color*.45f);w-=z.hp.lp(w,hp);wet[c]=z.lp.lp(w,lp);}
  float m=(wet[0]+wet[1])*.5f,s=(wet[0]-wet[1])*.5f*width;wet[0]=m+s;wet[1]=m-s;
