@@ -1,0 +1,30 @@
+name: AFTERGLOW Windows VST3
+on:
+  push:
+    branches: [main]
+    paths:
+      - Afterglow.cpp
+      - AfterglowPresets.h
+      - CMakeLists.txt
+      - .github/workflows/afterglow.yml
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -A x64
+      - run: cmake --build build --config Release --target Afterglow_VST3 --parallel 4
+      - name: Verify and stage bundle
+        shell: pwsh
+        run: |
+          $p = Get-ChildItem build -Recurse -Filter AFTERGLOW.vst3 | Where-Object { $_.PSIsContainer } | Select-Object -First 1
+          if (!$p) { throw "Missing bundle" }
+          if (!(Test-Path "$($p.FullName)/Contents/x86_64-win/AFTERGLOW.vst3")) { throw "Missing binary" }
+          New-Item -ItemType Directory -Force dist
+          Copy-Item $p.FullName dist -Recurse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AFTERGLOW-0.1-Windows-x64-VST3
+          path: dist/
+          if-no-files-found: error
