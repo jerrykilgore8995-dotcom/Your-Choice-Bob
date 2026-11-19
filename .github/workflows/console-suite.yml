@@ -1,0 +1,42 @@
+name: Bob Audio Console Suite Windows VST3
+on:
+  push:
+    branches: [main]
+    paths:
+      - ConsoleSuite.cpp
+      - CMakeLists.txt
+      - .github/workflows/console-suite.yml
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Warcry
+            product: WARCRY
+          - target: Thunderhead
+            product: THUNDERHEAD
+          - target: Blackiron
+            product: BLACKIRON
+          - target: Crown
+            product: CROWN
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -A x64
+      - run: cmake --build build --config Release --target ${{ matrix.target }}_VST3 --parallel 4
+      - name: Verify bundle
+        shell: pwsh
+        run: |
+          $name = "${{ matrix.product }}"
+          $p = Get-ChildItem build -Recurse -Filter "$name.vst3" | Where-Object { $_.PSIsContainer } | Select-Object -First 1
+          if (!$p) { throw "Missing bundle" }
+          if (!(Test-Path "$($p.FullName)/Contents/x86_64-win/$name.vst3")) { throw "Missing binary" }
+          New-Item -ItemType Directory -Force dist
+          Copy-Item $p.FullName dist -Recurse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.product }}-0.1-Windows-x64-VST3
+          path: dist/
+          if-no-files-found: error
