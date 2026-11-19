@@ -23,3 +23,23 @@ juce_add_plugin(Afterglow COMPANY_NAME "Bob Audio" PLUGIN_MANUFACTURER_CODE BobA
 target_sources(Afterglow PRIVATE Afterglow.cpp AfterglowPresets.h)
 target_compile_definitions(Afterglow PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
 target_link_libraries(Afterglow PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
+
+juce_add_plugin(Warcry COMPANY_NAME "Bob Audio" PLUGIN_MANUFACTURER_CODE BobA PLUGIN_CODE Wcry FORMATS VST3 PRODUCT_NAME "WARCRY" IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE COPY_PLUGIN_AFTER_BUILD FALSE)
+target_sources(Warcry PRIVATE ConsoleSuite.cpp)
+target_compile_definitions(Warcry PRIVATE BOB_MODE=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+target_link_libraries(Warcry PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
+
+juce_add_plugin(Thunderhead COMPANY_NAME "Bob Audio" PLUGIN_MANUFACTURER_CODE BobA PLUGIN_CODE Thdr FORMATS VST3 PRODUCT_NAME "THUNDERHEAD" IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE COPY_PLUGIN_AFTER_BUILD FALSE)
+target_sources(Thunderhead PRIVATE ConsoleSuite.cpp)
+target_compile_definitions(Thunderhead PRIVATE BOB_MODE=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+target_link_libraries(Thunderhead PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
+
+juce_add_plugin(Blackiron COMPANY_NAME "Bob Audio" PLUGIN_MANUFACTURER_CODE BobA PLUGIN_CODE Blir FORMATS VST3 PRODUCT_NAME "BLACKIRON" IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE COPY_PLUGIN_AFTER_BUILD FALSE)
+target_sources(Blackiron PRIVATE ConsoleSuite.cpp)
+target_compile_definitions(Blackiron PRIVATE BOB_MODE=2 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+target_link_libraries(Blackiron PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
+
+juce_add_plugin(Crown COMPANY_NAME "Bob Audio" PLUGIN_MANUFACTURER_CODE BobA PLUGIN_CODE Crwn FORMATS VST3 PRODUCT_NAME "CROWN" IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE COPY_PLUGIN_AFTER_BUILD FALSE)
+target_sources(Crown PRIVATE ConsoleSuite.cpp)
+target_compile_definitions(Crown PRIVATE BOB_MODE=3 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+target_link_libraries(Crown PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
