@@ -1,0 +1,70 @@
+name: FETLimiter74 and Lead85MKII Windows x64 VST3
+
+on:
+  push:
+    branches: [fet74-lead85-windows]
+    paths:
+      - 'imported/**'
+      - '.github/workflows/imported-plugins-windows.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'imported/**'
+      - '.github/workflows/imported-plugins-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-vst3:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: [FETLimiter74, Lead85MKII]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Windows x64
+        run: cmake -S imported -B build -G "Visual Studio 17 2022" -A x64
+      - name: Build and create VST3 manifest
+        run: cmake --build build --config Release --target ${{ matrix.plugin }}_VST3 --parallel 3
+      - name: Verify and stage the complete VST3 bundle
+        shell: pwsh
+        run: |
+          $name = '${{ matrix.plugin }}'
+          $bundle = "build/${name}_artefacts/Release/VST3/$name.vst3"
+          $binary = "$bundle/Contents/x86_64-win/$name.vst3"
+          $manifest = "$bundle/Contents/Resources/moduleinfo.json"
+          if (!(Test-Path -LiteralPath $binary -PathType Leaf)) { throw "Missing $binary" }
+          if (!(Test-Path -LiteralPath $manifest -PathType Leaf)) { throw "Missing $manifest" }
+
+          $bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $binary).Path)
+          $pe = [BitConverter]::ToInt32($bytes, 0x3c)
+          if ([BitConverter]::ToUInt16($bytes, 0) -ne 0x5a4d -or
+              [BitConverter]::ToUInt32($bytes, $pe) -ne 0x4550 -or
+              [BitConverter]::ToUInt16($bytes, $pe + 4) -ne 0x8664) {
+            throw "The VST3 module is not a Windows x64 PE binary"
+          }
+
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item -LiteralPath $bundle -Destination dist -Recurse
+      - name: Validate plug-in loading, processing and editor
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip'
+          curl.exe --fail --location --retry 3 --output pluginval.zip $url
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Expand-Archive -LiteralPath pluginval.zip -DestinationPath validator
+          $validator = Get-ChildItem validator -Recurse -Filter pluginval.exe | Select-Object -First 1
+          if (!$validator) { throw 'pluginval.exe was not found' }
+
+          $bundle = (Resolve-Path -LiteralPath 'dist/${{ matrix.plugin }}.vst3').Path
+          & $validator.FullName --strictness-level 5 --sample-rates 44100 --block-sizes 512 --validate $bundle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.plugin }}-1.0.0-Windows-x64-VST3
+          path: dist/
+          if-no-files-found: error

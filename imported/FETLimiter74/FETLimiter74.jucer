@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="FetLim74" name="FETLimiter74" projectType="audioplug"
+              version="1.0.0" bundleIdentifier="com.emergent.fetlimiter74"
+              cppLanguageStandard="17" jucerFormatVersion="1"
+              companyName="Emergent" companyCopyright="2026 Emergent"
+              pluginManufacturer="Emergent" pluginManufacturerCode="Emrg"
+              pluginCode="FL74" pluginAUExportPrefix="FETLimiter74AU"
+              pluginFormats="buildAU,buildVST3"
+              pluginName="FETLimiter74" pluginDesc="Vintage FET Limiter Emulation"
+              pluginCharacteristicsValue="">
+  <MAINGROUP id="MainGrp" name="FETLimiter74">
+    <GROUP id="SrcGrp" name="Source">
+      <FILE id="proc_h" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
+      <FILE id="proc_c" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="edit_h" name="PluginEditor.h" compile="0" resource="0"
+            file="Source/PluginEditor.h"/>
+      <FILE id="edit_c" name="PluginEditor.cpp" compile="1" resource="0"
+            file="Source/PluginEditor.cpp"/>
+      <GROUP id="DspGrp" name="DSP">
+        <FILE id="dsp_h" name="FETLimiterDSP.h" compile="0" resource="0"
+              file="Source/DSP/FETLimiterDSP.h"/>
+      </GROUP>
+    </GROUP>
+  </MAINGROUP>
+  <EXPORTFORMATS>
+    <XCODE_MAC targetFolder="Builds/MacOSX" macOSDeploymentTarget="10.13">
+      <CONFIGURATIONS>
+        <CONFIGURATION name="Debug"   isDebug="1" optimisation="1" targetName="FETLimiter74"/>
+        <CONFIGURATION name="Release" isDebug="0" optimisation="3" targetName="FETLimiter74"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics"         path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices"        path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats"        path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client"  path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors"     path="../JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils"          path="../JUCE/modules"/>
+        <MODULEPATH id="juce_core"                 path="../JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures"      path="../JUCE/modules"/>
+        <MODULEPATH id="juce_dsp"                  path="../JUCE/modules"/>
+        <MODULEPATH id="juce_events"               path="../JUCE/modules"/>
+        <MODULEPATH id="juce_graphics"             path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics"           path="../JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra"            path="../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+  </EXPORTFORMATS>
+  <MODULES>
+    <MODULE id="juce_audio_basics"        showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices"       showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats"       showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors"    showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_audio_utils"         showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_core"                showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures"     showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp"                 showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_events"              showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_graphics"            showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics"          showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra"           showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+  </MODULES>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <LIVE_SETTINGS><OSX/></LIVE_SETTINGS>
+</JUCERPROJECT>
