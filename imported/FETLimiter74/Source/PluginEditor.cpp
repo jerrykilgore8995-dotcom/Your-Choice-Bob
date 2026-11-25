@@ -266,31 +266,28 @@ public:
                    const juce::String& paramId,
                    std::initializer_list<juce::String> labels)
     {
-        auto* raw = s.getParameter (paramId);
-        choiceParam = dynamic_cast<juce::AudioParameterChoice*> (raw);
-        jassert (choiceParam != nullptr);
+        auto* parameter = s.getParameter (paramId);
+        jassert (parameter != nullptr);
 
         int i = 0;
         for (auto& l : labels)
         {
             auto b = std::make_unique<juce::ToggleButton> (l);
             b->setClickingTogglesState (true);
-            b->setRadioGroupId (nextRadioGroup());
+            b->setRadioGroupId (1);
             const int idx = i++;
             auto* bPtr = b.get();
             b->onClick = [this, idx, bPtr]
             {
-                if (bPtr->getToggleState() && choiceParam != nullptr)
-                    *choiceParam = idx;
+                if (bPtr->getToggleState())
+                    attachment->setValueAsCompleteGesture (static_cast<float> (idx));
             };
             addAndMakeVisible (*b);
             buttons.push_back (std::move (b));
         }
 
-        attachment.reset (new juce::ParameterAttachment (
-            *raw,
-            [this] (float v) { syncButtons ((int) v); },
-            nullptr));
+        attachment = std::make_unique<juce::ParameterAttachment> (
+            *parameter, [this] (float value) { syncButtons (static_cast<int> (value)); });
         attachment->sendInitialUpdate();
     }
 
@@ -303,8 +300,6 @@ public:
     }
 
 private:
-    static int nextRadioGroup() { static int n = 100; return ++n; }
-
     void syncButtons (int idx)
     {
         for (int i = 0; i < (int) buttons.size(); ++i)
@@ -312,7 +307,6 @@ private:
     }
 
     std::vector<std::unique_ptr<juce::ToggleButton>> buttons;
-    juce::AudioParameterChoice* choiceParam { nullptr };
     std::unique_ptr<juce::ParameterAttachment> attachment;
 };
 

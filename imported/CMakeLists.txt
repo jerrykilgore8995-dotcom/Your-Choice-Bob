@@ -27,6 +27,7 @@ function(add_emergent_plugin name code bundle_id description)
         ${name}/Source/PluginEditor.cpp
     )
     target_compile_features(${name} PRIVATE cxx_std_17)
+    target_compile_options(${name} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
     target_compile_definitions(${name} PUBLIC
         JUCE_STRICT_REFCOUNTEDPOINTER=1
         JUCE_VST3_CAN_REPLACE_VST2=0

@@ -195,12 +195,49 @@ namespace lead85
                 return y;
             };
             const float a = tube (juce::jmax (0.0f,  plus * drive));
-            const float b = tube (juce::jmax (0.0f, -minus * drive));
+            const float b = tube (juce::jmax (0.0f, minus * drive));
             return (a - b) / drive;
         }
     private:
         float drive { 1.0f };
         Mode  mode  { Mode::ClassATriode };
+    };
+
+    //--------------------------------------------------------------------------
+    // Output transformer (push-pull plate load):
+    //  - LF rolloff ~65 Hz from primary inductance
+    //  - HF rolloff ~5.5 kHz from leakage inductance + plate caps
+    //    (deliberately band-limited - this is what keeps a real guitar amp
+    //     out of the "fizz" region.  A real Mesa Mark OT is ~ 5-7 kHz -3dB.)
+    //  - tanh core saturation above ~several hundred mV reflected secondary
+    //--------------------------------------------------------------------------
+    class OutputTransformer
+    {
+    public:
+        void prepare (double sr, float lowHz = 65.0f, float highHz = 5500.0f)
+        {
+            const float twopi = juce::MathConstants<float>::twoPi;
+            hp = std::exp (-twopi * lowHz  / (float) sr);
+            // Two cascaded 1-pole LPFs give a steeper, more realistic HF
+            // skirt (12 dB/oct) matching an actual guitar OT.
+            lp = std::exp (-twopi * highHz / (float) sr);
+            x1 = y1 = y2 = y3 = 0.0f;
+        }
+        void reset() { x1 = y1 = y2 = y3 = 0.0f; }
+
+        inline float processSample (float x) noexcept
+        {
+            // 1-pole HPF (primary inductance)
+            float y = hp * (y1 + x - x1);
+            x1 = x; y1 = y;
+            // Two cascaded 1-pole LPFs (leakage inductance + stray C)
+            y2 = (1.0f - lp) * y  + lp * y2;
+            y3 = (1.0f - lp) * y2 + lp * y3;
+            // Soft core saturation
+            return std::tanh (y3 * 0.8f) * 1.25f;
+        }
+    private:
+        float hp { 0 }, lp { 0 }, x1 { 0 }, y1 { 0 }, y2 { 0 }, y3 { 0 };
     };
 
     //--------------------------------------------------------------------------
@@ -386,43 +423,6 @@ namespace lead85
         double sampleRate { 44100.0 };
         Filter bands[2][5];
         float  gainDb[5] { 0,0,0,0,0 };
-    };
-
-    //--------------------------------------------------------------------------
-    // Output transformer (push-pull plate load):
-    //  - LF rolloff ~65 Hz from primary inductance
-    //  - HF rolloff ~5.5 kHz from leakage inductance + plate caps
-    //    (deliberately band-limited - this is what keeps a real guitar amp
-    //     out of the "fizz" region.  A real Mesa Mark OT is ~ 5-7 kHz -3dB.)
-    //  - tanh core saturation above ~several hundred mV reflected secondary
-    //--------------------------------------------------------------------------
-    class OutputTransformer
-    {
-    public:
-        void prepare (double sr, float lowHz = 65.0f, float highHz = 5500.0f)
-        {
-            const float twopi = juce::MathConstants<float>::twoPi;
-            hp = std::exp (-twopi * lowHz  / (float) sr);
-            // Two cascaded 1-pole LPFs give a steeper, more realistic HF
-            // skirt (12 dB/oct) matching an actual guitar OT.
-            lp = std::exp (-twopi * highHz / (float) sr);
-            x1 = y1 = y2 = y3 = 0.0f;
-        }
-        void reset() { x1 = y1 = y2 = y3 = 0.0f; }
-
-        inline float processSample (float x) noexcept
-        {
-            // 1-pole HPF (primary inductance)
-            float y = hp * (y1 + x - x1);
-            x1 = x; y1 = y;
-            // Two cascaded 1-pole LPFs (leakage inductance + stray C)
-            y2 = (1.0f - lp) * y  + lp * y2;
-            y3 = (1.0f - lp) * y2 + lp * y3;
-            // Soft core saturation
-            return std::tanh (y3 * 0.8f) * 1.25f;
-        }
-    private:
-        float hp { 0 }, lp { 0 }, x1 { 0 }, y1 { 0 }, y2 { 0 }, y3 { 0 };
     };
 
     //--------------------------------------------------------------------------

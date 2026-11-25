@@ -56,6 +56,10 @@ jobs:
           $url = 'https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip'
           curl.exe --fail --location --retry 3 --output pluginval.zip $url
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $expectedHash = 'C08E61CE3B96DB41636F8EC7E76F4C7E2C13EBDAC7FA1B5A1F52B4F32EC715AB'
+          if ((Get-FileHash -LiteralPath pluginval.zip).Hash -ne $expectedHash) {
+            throw 'pluginval archive checksum mismatch'
+          }
           Expand-Archive -LiteralPath pluginval.zip -DestinationPath validator
           $validator = Get-ChildItem validator -Recurse -Filter pluginval.exe | Select-Object -First 1
           if (!$validator) { throw 'pluginval.exe was not found' }
