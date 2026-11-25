@@ -25,7 +25,7 @@ public:
 
     juce::Font getLabelFont (juce::Label&) override
     {
-        return juce::Font ("Helvetica", 10.5f, juce::Font::bold);
+        return juce::Font (juce::FontOptions (10.5f, juce::Font::bold));
     }
 };
 
@@ -46,7 +46,7 @@ public:
 
 private:
     juce::Slider knob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
-    juce::Label  cap, pullCap;
+    juce::Label cap;
     juce::ToggleButton pullBtn { "PULL" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> att;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> pullAtt;
@@ -54,7 +54,7 @@ private:
 };
 
 //==============================================================================
-class Lead85MKIIEditor  : public juce::AudioProcessorEditor
+class Lead85MKIIEditor  : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     explicit Lead85MKIIEditor (Lead85MKIIProcessor&);
@@ -76,20 +76,28 @@ private:
     // Input + Output + Lead mode + Class + Power
     juce::Slider inputKnob   { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
     juce::Slider outputKnob  { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
-    juce::Label  inputLbl, outputLbl, leadLbl, classLbl, reverbOnLbl, powerLbl;
+    juce::Label inputLbl, outputLbl;
+    juce::ToggleButton standbyBtn { "STANDBY" };
+    juce::ToggleButton cabinetBtn { "CAB" };
+    juce::TextButton loadIR { "Load WAV..." };
+    juce::ComboBox factoryIR;
+    juce::Label irName;
+    juce::String displayedIR;
+    std::unique_ptr<juce::FileChooser> chooser;
+    void timerCallback() override;
+    void chooseIR();
     juce::ToggleButton leadBtn  { "LEAD" };
     juce::ToggleButton classBtn { "CLASS A" };
     juce::ToggleButton reverbOnBtn { "REV IN" };
     juce::ToggleButton powerBtn { "POWER" };
     std::unique_ptr<APVTS::SliderAttachment> inAtt, outAtt;
-    std::unique_ptr<APVTS::ButtonAttachment> leadAtt, classAtt, reverbOnAtt, powerAtt;
+    std::unique_ptr<APVTS::ButtonAttachment> leadAtt, classAtt, reverbOnAtt, powerAtt, standbyAtt, cabinetAtt;
 
     // Row 2 - graphic EQ (5 sliders + ON switch + freq labels)
     std::array<juce::Slider, 5> geqBands;
     std::array<juce::Label,  5> geqLbls;
     std::array<std::unique_ptr<APVTS::SliderAttachment>, 5> geqAtts;
     juce::ToggleButton geqOnBtn { "EQ IN" };
-    juce::Label geqSectLbl;
     std::unique_ptr<APVTS::ButtonAttachment> geqOnAtt;
 
     // Power/drive LED

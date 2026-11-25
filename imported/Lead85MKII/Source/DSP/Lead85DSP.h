@@ -62,7 +62,7 @@ namespace lead85
                       float gainLin, float biasVolts, float headroom = 1.0f,
                       float cathodeCapHz = 100.0f, float cathodeShelfDb = -3.5f)
         {
-            sampleRate = sr;
+            gridDrive = 24.0f * 44100.0f / static_cast<float> (sr);
             const float twopi = juce::MathConstants<float>::twoPi;
             hpCoef   = std::exp (-twopi * couplingHz / (float) sr);
             lpCoef   = std::exp (-twopi * millerHz  / (float) sr);
@@ -132,7 +132,7 @@ namespace lead85
             const float igk = dempwolfGridCurrent (vgk);
             // Charge pump: each conducting sample shifts gridDc negative;
             // then it leaks back toward 0 at the cap time constant.
-            gridDc = gridDc * gridRecoverCoef - igk * 180.0f;    // volts
+            gridDc = gridDc * gridRecoverCoef - igk * gridDrive;    // volts
             // Re-clamp vgk after bias shift (same sample)
             vgk = VgkQ + gridDc + gridAC;
 
@@ -153,7 +153,7 @@ namespace lead85
             return y1 * hr - bias;
         }
     private:
-        double sampleRate { 44100.0 };
+        float gridDrive { 24.0f };
         float hpCoef { 0 }, lpCoef { 0 };
         float cathodeCoef { 0 }, cathodeShelfG { 1.0f };
         float gridRecoverCoef { 0 };
@@ -186,11 +186,12 @@ namespace lead85
                 if (mode == Mode::ClassATriode)
                 {
                     // Smooth triode (6L6 wired as triode) - mostly 2nd harm
-                    return std::tanh (v) * (1.0f - 0.05f * v * v);
+                    return std::tanh (v);
                 }
                 // Class-AB pentode: sharper upper knee, 3rd harm emphasis,
                 // crossover notch at low signal level
-                const float y = std::tanh (v * 1.1f) - 0.08f * v * v * v;
+                const float saturated = std::tanh (v * 1.1f);
+                const float y = saturated - 0.035f * saturated * saturated * saturated;
                 const float co = 0.02f;
                 if (std::abs (v) < co) return y * (std::abs (v) / co);  // crossover
                 return y;
@@ -251,8 +252,8 @@ namespace lead85
     public:
         void prepare (double sr)
         {
-            v5a.prepare (sr, 100.0f, 15000.0f, 3.5f, 0.0f, 2.0f);
-            v5b.prepare (sr, 100.0f, 15000.0f, 3.5f, 0.0f, 2.0f);
+            v5a.prepare (sr, 100.0f, 15000.0f, 2.8f, 0.0f, 2.0f);
+            v5b.prepare (sr, 100.0f, 15000.0f, 2.8f, 0.0f, 2.0f);
             inner.prepare (sr);  inner.setMode (TubePowerPair::Mode::ClassATriode);
             outer.prepare (sr);  outer.setMode (TubePowerPair::Mode::ClassABPentode);
             xfmr.prepare (sr, 65.0f, 9500.0f);
@@ -312,7 +313,7 @@ namespace lead85
     class ToneStack
     {
     public:
-        using Coeffs = juce::dsp::IIR::Coefficients<float>;
+        using Coeffs = juce::dsp::IIR::ArrayCoefficients<float>;
         using Filter = juce::dsp::IIR::Filter<float>;
 
         void prepare (double sr)
@@ -366,11 +367,11 @@ namespace lead85
 
             for (int c = 0; c < 2; ++c)
             {
-                *treble[c].coefficients = *tc;
-                *middle[c].coefficients = *mc;
-                *bass  [c].coefficients = *bc;
-                *bright[c].coefficients = *brc;
-                *shift [c].coefficients = *shc;
+                *treble[c].coefficients = tc;
+                *middle[c].coefficients = mc;
+                *bass  [c].coefficients = bc;
+                *bright[c].coefficients = brc;
+                *shift [c].coefficients = shc;
             }
         }
 
@@ -387,7 +388,7 @@ namespace lead85
     class GraphicEQ5
     {
     public:
-        using Coeffs = juce::dsp::IIR::Coefficients<float>;
+        using Coeffs = juce::dsp::IIR::ArrayCoefficients<float>;
         using Filter = juce::dsp::IIR::Filter<float>;
 
         static constexpr float freqs[5] = { 80.0f, 240.0f, 750.0f, 2200.0f, 6600.0f };
@@ -411,7 +412,7 @@ namespace lead85
             gainDb[i] = juce::jlimit (-12.0f, 12.0f, db);
             auto coeff = Coeffs::makePeakFilter (sampleRate, freqs[i], 1.1f,
                                                  juce::Decibels::decibelsToGain (gainDb[i]));
-            for (int c = 0; c < 2; ++c) *bands[c][i].coefficients = *coeff;
+            for (int c = 0; c < 2; ++c) *bands[c][i].coefficients = coeff;
         }
 
         inline float processSample (int ch, float x) noexcept
@@ -527,7 +528,7 @@ namespace lead85
     class Presence
     {
     public:
-        using Coeffs = juce::dsp::IIR::Coefficients<float>;
+        using Coeffs = juce::dsp::IIR::ArrayCoefficients<float>;
         using Filter = juce::dsp::IIR::Filter<float>;
 
         void prepare (double sr) { sampleRate = sr; for (auto& f : filt) f.reset(); set (0.0f); }
@@ -537,7 +538,7 @@ namespace lead85
         {
             auto c = Coeffs::makeHighShelf (sampleRate, 3500.0f, 0.6f,
                                             juce::Decibels::decibelsToGain (db));
-            for (int ch = 0; ch < 2; ++ch) *filt[ch].coefficients = *c;
+            for (int ch = 0; ch < 2; ++ch) *filt[ch].coefficients = c;
         }
         inline float processSample (int ch, float x) noexcept
         {

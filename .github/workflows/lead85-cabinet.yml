@@ -1,0 +1,68 @@
+name: Lead85MKII cabinet build and verification
+
+on:
+  push:
+    branches: [lead85-cabinet]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vst3:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S imported -B build -G "Visual Studio 17 2022" -A x64
+      - run: cmake --build build --config Release --target Lead85MKII_VST3 --parallel 3
+      - name: Check Windows VST3
+        shell: pwsh
+        run: |
+          $bundle = (Resolve-Path 'build/Lead85MKII_artefacts/Release/VST3/Lead85MKII.vst3').Path
+          $manifest = Join-Path $bundle 'Contents/Resources/moduleinfo.json'
+          $binary = Join-Path $bundle 'Contents/x86_64-win/Lead85MKII.vst3'
+          if (!(Test-Path $manifest) -or !(Test-Path $binary)) { throw 'Incomplete VST3 bundle' }
+          $data = [IO.File]::ReadAllBytes($binary)
+          $pe = [BitConverter]::ToInt32($data, 60)
+          if ([BitConverter]::ToUInt16($data, $pe + 4) -ne 0x8664) { throw 'Expected Windows x64' }
+          curl.exe --fail --location --retry 3 --output pluginval.zip https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-FileHash pluginval.zip).Hash -ne 'C08E61CE3B96DB41636F8EC7E76F4C7E2C13EBDAC7FA1B5A1F52B4F32EC715AB') { throw 'pluginval checksum mismatch' }
+          Expand-Archive pluginval.zip validator
+          & ./validator/pluginval.exe --strictness-level 5 --sample-rates 44100 --block-sizes 512 --validate $bundle
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Copy-Item -LiteralPath $bundle -Destination dist -Recurse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lead85MKII-1.1.0-Windows-x64-VST3
+          path: dist/
+          if-no-files-found: error
+
+  editor-and-audio:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S imported/gui-preview -B build -G "Visual Studio 17 2022" -A x64
+      - run: cmake --build build --config Release --target EmergentGuiPreview --parallel 3
+      - name: Capture the Windows editor and test a real Creamback WAV
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 3 --output science.zip https://www.scienceamps.com/uploads/4/9/8/9/49897661/science_4x12_irs.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Expand-Archive science.zip science
+          $ir = Get-ChildItem science -Recurse -Filter '*G12H-75*SM57*Darker.wav' | Select-Object -First 1
+          if (!$ir) { throw 'Creamback IR not found in provider ZIP' }
+          Copy-Item -LiteralPath $ir.FullName -Destination Creamback-test.wav
+          & ./build/EmergentGuiPreview_artefacts/Release/EmergentGuiPreview.exe Creamback-test.wav | Tee-Object Lead85MKII-audio-check.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Lead85MKII-Cabinet-Editor-And-Audio
+          path: |
+            Lead85MKII-GUI.png
+            Lead85MKII-audio-check.txt
+          if-no-files-found: error

@@ -11,7 +11,7 @@ target_compile_options(EmergentGuiPreview PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf
 target_compile_definitions(EmergentGuiPreview PRIVATE
     JUCE_STRICT_REFCOUNTEDPOINTER=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 target_link_libraries(EmergentGuiPreview PRIVATE
-    juce::juce_audio_processors juce::juce_dsp juce::juce_recommended_config_flags)
+    juce::juce_audio_processors juce::juce_dsp juce::juce_recommended_config_flags Lead85IRS)
 
 foreach(plugin IN ITEMS FETLimiter74 Lead85MKII)
     set(source_dir "${CMAKE_CURRENT_LIST_DIR}/../${plugin}/Source")

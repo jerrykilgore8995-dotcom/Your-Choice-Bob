@@ -10,8 +10,9 @@ FetchContent_Declare(JUCE
 )
 FetchContent_MakeAvailable(JUCE)
 
-function(add_emergent_plugin name code bundle_id description)
+function(add_emergent_plugin name code bundle_id description version)
     juce_add_plugin(${name}
+        VERSION ${version}
         COMPANY_NAME Emergent
         BUNDLE_ID ${bundle_id}
         PLUGIN_MANUFACTURER_CODE Emrg
@@ -42,5 +43,14 @@ function(add_emergent_plugin name code bundle_id description)
     )
 endfunction()
 
-add_emergent_plugin(FETLimiter74 FL74 com.emergent.fetlimiter74 "Vintage FET Limiter Emulation")
-add_emergent_plugin(Lead85MKII L85M com.emergent.lead85mkii "Tube Lead Preamp Emulation (Dempwolf model)")
+add_emergent_plugin(FETLimiter74 FL74 com.emergent.fetlimiter74 "Vintage FET Limiter Emulation" 1.0.0)
+add_emergent_plugin(Lead85MKII L85M com.emergent.lead85mkii "Tube Amplifier and Cabinet IR Loader" 1.1.0)
+
+juce_add_binary_data(Lead85IRS HEADER_NAME Lead85IRData.h NAMESPACE Lead85IRData SOURCES
+    Lead85MKII/IR/V30_SM57.wav
+    Lead85MKII/IR/V30_SM57_Alt.wav
+    Lead85MKII/IR/Greenback_SM57.wav
+    Lead85MKII/IR/Greenback_e606.wav
+)
+target_link_libraries(Lead85MKII PRIVATE Lead85IRS)
+set_target_properties(Lead85IRS PROPERTIES POSITION_INDEPENDENT_CODE TRUE)

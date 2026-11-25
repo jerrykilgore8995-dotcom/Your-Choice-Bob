@@ -30,7 +30,7 @@ APVTS::ParameterLayout Lead85MKIIProcessor::createLayout()
     p.push_back (std::make_unique<PB>("pullShift", "Bass Pull Shift", false));
 
     p.push_back (k01 ("master1",  "Master 1", 0.5f));
-    p.push_back (std::make_unique<PB>("pullGain", "Pull Gain Boost", false));
+    p.push_back (std::make_unique<PB>("pullGain", "Pull Deep", false));
 
     p.push_back (std::make_unique<PB>("leadMode", "Lead Channel", false));
     p.push_back (k01 ("leadDrive", "Lead Drive",  0.5f));
@@ -55,6 +55,9 @@ APVTS::ParameterLayout Lead85MKIIProcessor::createLayout()
     p.push_back (std::make_unique<PB>("classA", "Class A Mode", false));
     p.push_back (kDb ("output",   "Output",   -24.0f, 12.0f, 0.0f));
     p.push_back (std::make_unique<PB>("powerOn", "Power",       true));
+
+    p.push_back (std::make_unique<PB>(juce::ParameterID { "standby", 2 }, "Standby", false));
+    p.push_back (std::make_unique<PB>(juce::ParameterID { "cabEnabled", 2 }, "Cabinet", true));
 
     return { p.begin(), p.end() };
 }
@@ -88,6 +91,8 @@ Lead85MKIIProcessor::Lead85MKIIProcessor()
     pClassA         = apvts.getRawParameterValue ("classA");
     pOutput         = apvts.getRawParameterValue ("output");
     pPowerOn        = apvts.getRawParameterValue ("powerOn");
+    pCabEnabled     = apvts.getRawParameterValue ("cabEnabled");
+    pStandby        = apvts.getRawParameterValue ("standby");
 }
 
 bool Lead85MKIIProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -100,26 +105,64 @@ bool Lead85MKIIProcessor::isBusesLayoutSupported (const BusesLayout& layouts) co
 
 void Lead85MKIIProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    for (auto& c : ch) { c.prepare (sampleRate, samplesPerBlock); c.reset(); }
-    tone.prepare (sampleRate);
-    geq .prepare (sampleRate);
-    presence.prepare (sampleRate);
+    const auto channels = getTotalNumOutputChannels();
+    processingBlockSize = juce::jmax (1, samplesPerBlock);
+    oversampling = std::make_unique<juce::dsp::Oversampling<float>> (
+        static_cast<size_t> (channels), 1,
+        juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, true);
+    oversampling->initProcessing (static_cast<size_t> (processingBlockSize));
+    const auto ampRate = sampleRate * 2.0;
+    for (auto& c : ch) { c.prepare (ampRate, processingBlockSize * 2); c.reset(); }
+    tone.prepare (ampRate);
+    geq.prepare (ampRate);
+    presence.prepare (ampRate);
+    cabinet.prepare (sampleRate, processingBlockSize, channels, pCabEnabled->load() > 0.5f);
+    setLatencySamples (juce::roundToInt (oversampling->getLatencyInSamples()));
     currentDriveLedBrightness.store (0.0f);
+    wasMuted = false;
 }
 
-//==============================================================================
 void Lead85MKIIProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
-    const int numCh = juce::jmin (buffer.getNumChannels(), 2);
-    const int n     = buffer.getNumSamples();
-    if (numCh == 0 || n == 0) return;
+    if (buffer.getNumChannels() == 0 || buffer.getNumSamples() == 0)
+        return;
 
-    const bool powerOn = pPowerOn->load() > 0.5f;
-    if (! powerOn) { buffer.clear(); currentDriveLedBrightness.store (0.0f); return; }
+    if (pPowerOn->load() <= 0.5f || pStandby->load() > 0.5f)
+    {
+        if (!wasMuted)
+        {
+            for (auto& c : ch)
+                c.reset();
+            tone.reset();
+            geq.reset();
+            presence.reset();
+            cabinet.reset();
+            oversampling->reset();
+            wasMuted = true;
+        }
+        buffer.clear();
+        currentDriveLedBrightness.store (0.0f);
+        return;
+    }
 
+    wasMuted = false;
+    auto audio = juce::dsp::AudioBlock<float> (buffer);
+    for (size_t start = 0; start < audio.getNumSamples(); start += static_cast<size_t> (processingBlockSize))
+    {
+        auto n = juce::jmin (static_cast<size_t> (processingBlockSize), audio.getNumSamples() - start);
+        auto part = audio.getSubBlock (start, n);
+        processAmp (oversampling->processSamplesUp (part));
+        oversampling->processSamplesDown (part);
+    }
+
+    cabinet.process (buffer, pCabEnabled->load() > 0.5f);
+    buffer.applyGain (juce::Decibels::decibelsToGain (pOutput->load()));
+}
+
+void Lead85MKIIProcessor::processAmp (juce::dsp::AudioBlock<float> block)
+{
     const float inGain    = juce::Decibels::decibelsToGain (pInput ->load());
-    const float outGain   = juce::Decibels::decibelsToGain (pOutput->load());
     const float vol1      = pVolume1   ->load();
     const float trDb      = juce::jmap (pTreble ->load(), 0.0f, 1.0f, -12.0f, 12.0f);
     const float mdDb      = juce::jmap (pMiddle ->load(), 0.0f, 1.0f, -12.0f,  6.0f);
@@ -132,7 +175,7 @@ void Lead85MKIIProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     const bool  pBright1  = pPullBright1->load() > 0.5f;
     const bool  pTreb     = pPullTreble ->load() > 0.5f;
     const bool  pShift    = pPullShift  ->load() > 0.5f;
-    const bool  pGain     = pPullGain   ->load() > 0.5f;
+    const bool  pullDeep  = pPullGain   ->load() > 0.5f;
     const bool  pLBright  = pPullLeadBright->load() > 0.5f;
     const bool  leadMode  = pLeadMode  ->load() > 0.5f;
     const bool  geqOn     = pGeqOn     ->load() > 0.5f;
@@ -153,12 +196,12 @@ void Lead85MKIIProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
 
     float peakGr = 0.0f;
 
-    for (int cI = 0; cI < numCh; ++cI)
+    for (size_t cI = 0; cI < block.getNumChannels(); ++cI)
     {
         auto& c   = ch[cI];
-        auto* buf = buffer.getWritePointer (cI);
+        auto* buf = block.getChannelPointer (cI);
 
-        for (int i = 0; i < n; ++i)
+        for (size_t i = 0; i < block.getNumSamples(); ++i)
         {
             // --- 1) Input gain + V1A (first high-gain triode) ---
             float x = buf[i] * inGain;
@@ -172,16 +215,6 @@ void Lead85MKIIProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
 
             // --- 4) Volume 1 pot ---
             x *= vol1;
-
-            // --- 5) PULL GAIN - inserts extra V2A -> V2B cascade ---
-            if (pGain)
-            {
-                x = c.v2a.processSample (x * 1.3f);
-                x = c.v2b.processSample (x);
-            }
-
-            // --- 6) Master 1 ---
-            x *= master1;
 
             // --- 7) Reverb send/return (parallel) - skipped entirely when
             //        REVERB IN switch is off: V3A driver and V4 recovery
@@ -197,15 +230,18 @@ void Lead85MKIIProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
             // --- 8) [LEAD mode] V4A -> V3B cascade with Lead Drive -> Lead Master ---
             if (leadMode)
             {
-                const float driveLin = juce::jmap (leadDrv, 0.0f, 1.0f, 0.5f, 6.0f);
+                const float driveLin = juce::jmap (leadDrv * leadDrv, 0.0f, 1.0f, 0.3f, 4.0f);
                 const float brightMul = pLBright ? 1.2f : 1.0f;
                 x = c.v4a.processSample (x * driveLin * brightMul);
                 x = c.v3b.processSample (x);
                 x *= leadMast;
             }
 
-            // Blend reverb back in
-            x += rev * 0.4f;
+            // Master 1 sets power-stage drive in both channels.
+            x = x * master1 + rev * 0.4f;
+            const auto deeper = c.deep.processSample (x);
+            if (pullDeep)
+                x = deeper;
 
             // --- 9) GRAPHIC EQ (switchable - between preamp and power amp) ---
             if (geqOn) x = geq.processSample (cI, x);
@@ -216,9 +252,6 @@ void Lead85MKIIProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
 
             // --- 11) Presence (NFB high-shelf) adds post-NFB sparkle ---
             x = presence.processSample (cI, x);
-
-            // --- 12) Output trim ---
-            x = x * outGain;
 
             buf[i] = x;
 
@@ -237,13 +270,26 @@ juce::AudioProcessorEditor* Lead85MKIIProcessor::createEditor() { return new Lea
 
 void Lead85MKIIProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (auto xml = apvts.copyState().createXml()) copyXmlToBinary (*xml, destData);
+    auto state = apvts.copyState();
+    cabinet.store (state);
+    if (auto xml = state.createXml())
+        copyXmlToBinary (*xml, destData);
 }
 void Lead85MKIIProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
-            apvts.replaceState (juce::ValueTree::fromXml (*xml));
+        {
+            auto state = juce::ValueTree::fromXml (*xml);
+            const auto oldSession = !state.getChildWithProperty ("id", "cabEnabled").isValid();
+            cabinet.restore (state);
+            state.removeProperty ("cabWav", nullptr);
+            state.removeProperty ("cabName", nullptr);
+            state.removeProperty ("cabFactory", nullptr);
+            apvts.replaceState (state);
+            if (oldSession)
+                apvts.getParameter ("cabEnabled")->setValueNotifyingHost (0.0f);
+        }
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new Lead85MKIIProcessor(); }
