@@ -11,7 +11,9 @@ BLOCK_SIZE = 512
 
 
 def check_audio(bundle: Path, lead_mode: bool = False) -> None:
-    plugin = load_plugin(str(bundle.resolve()))
+    # Pedalboard's Windows scanner expects the module file inside the bundle.
+    module = bundle / 'Contents' / 'x86_64-win' / bundle.name
+    plugin = load_plugin(str(module.resolve()))
     if lead_mode:
         plugin.lead_channel = True
 
