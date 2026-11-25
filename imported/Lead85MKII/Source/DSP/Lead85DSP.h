@@ -138,13 +138,14 @@ namespace lead85
 
             // 5) Dempwolf plate current + plate-load voltage swing
             constexpr float VpkQ  = 220.0f;
-            constexpr float Rload = 100.0f;              // 100k expressed as 1 V = 10 mA
+            constexpr float Rload = 100000.0f;           // 100 kOhm converts amperes to volts
             const float Ipk  = dempwolfPlateCurrent (vgk, VpkQ);
             const float IpkQ = dempwolfPlateCurrent (VgkQ, VpkQ);
             const float plateSwing = -(Ipk - IpkQ) * Rload;      // phase inverted
 
-            // 6) Scale back to audio units with headroom trim
-            float y = plateSwing * 0.02f / hr;
+            // 6) Map the plate voltage to a normalized interstage signal.
+            constexpr float plateVoltsToAudio = 0.00125f;
+            float y = plateSwing * plateVoltsToAudio / hr;
             y = std::tanh (y);                                   // soft outer limit
 
             // 7) Miller-cap HF rolloff
@@ -288,7 +289,8 @@ namespace lead85
             // 5) Sum through the transformer primary
             const float sum = classAOnly ? inSum
                                          : (inSum * 0.55f + outSum * 0.55f);
-            const float yOut = xfmr.processSample (sum);
+            // Orient the secondary so feeding back its output opposes the input.
+            const float yOut = xfmr.processSample (-sum);
 
             // 6) Lowpass the output for the NFB loop
             nfbState = (1.0f - nfbCoef) * yOut + nfbCoef * nfbState;

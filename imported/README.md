@@ -1,6 +1,8 @@
 # FETLimiter74 and Lead85MKII for Windows
 
-The [Windows workflow](https://github.com/jerrykilgore8995-dotcom/Your-Choice-Bob/actions/workflows/imported-plugins-windows.yml) builds and validates both plugins as Windows x64 VST3 bundles.
+The [Windows workflow](https://github.com/jerrykilgore8995-dotcom/Your-Choice-Bob/actions/workflows/imported-plugins-windows.yml) builds both plugins as Windows x64 VST3 bundles, runs pluginval, and checks
+audio output at 44.1 kHz with a 512-sample buffer. The plug-in bundles link
+the Visual C++ runtime statically.
 
 Extract each artifact ZIP and copy the entire `.vst3` folder into
 `C:\Program Files\Common Files\VST3`. Restart Studio One or rescan its plug-ins.
