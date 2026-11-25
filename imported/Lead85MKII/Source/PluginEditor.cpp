@@ -447,9 +447,10 @@ void Lead85MKIIEditor::timerCallback()
     if (name != displayedIR)
     {
         displayedIR = name;
-        factoryIR.setSelectedId (proc.getFactoryCabinet() + 1, juce::dontSendNotification);
-        irName.setText (name, juce::dontSendNotification);
-        irName.setTooltip (name);
+        const auto factoryId = proc.getFactoryCabinet() + 1;
+        factoryIR.setSelectedId (factoryId, juce::dontSendNotification);
+        irName.setText (factoryId == 0 ? name : juce::String(), juce::dontSendNotification);
+        irName.setTooltip (factoryId == 0 ? name : juce::String());
     }
 }
 

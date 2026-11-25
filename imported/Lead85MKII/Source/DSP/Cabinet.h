@@ -12,7 +12,7 @@ public:
     {
         juce::MemoryBlock bytes;
         if (!file.existsAsFile() || file.getSize() > maxFileBytes || !file.loadFileAsData (bytes))
-            return juce::Result::fail ("Choose a WAV cabinet IR under 2 MB.");
+            return juce::Result::fail ("Choose a WAV cabinet IR under 4 MB.");
 
         return load (std::move (bytes), file.getFileName());
     }
@@ -20,15 +20,15 @@ public:
     juce::Result load (juce::MemoryBlock bytes, const juce::String& name, int builtIn = -1)
     {
         if (bytes.getSize() == 0 || bytes.getSize() > maxFileBytes)
-            return juce::Result::fail ("Choose a WAV cabinet IR under 2 MB.");
+            return juce::Result::fail ("Choose a WAV cabinet IR under 4 MB.");
 
         juce::WavAudioFormat wav;
         std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (
             new juce::MemoryInputStream (bytes, false), true));
         if (reader == nullptr || reader->numChannels < 1 || reader->numChannels > 2
             || reader->sampleRate < 8000.0 || reader->sampleRate > 384000.0
-            || reader->lengthInSamples < 1 || reader->lengthInSamples > reader->sampleRate)
-            return juce::Result::fail ("The cabinet IR must be a mono or stereo WAV up to one second.");
+            || reader->lengthInSamples < 1 || reader->lengthInSamples > 2.0 * reader->sampleRate)
+            return juce::Result::fail ("The cabinet IR must be a mono or stereo WAV up to two seconds.");
 
         Impulse next;
         next.rate = reader->sampleRate;
@@ -158,6 +158,7 @@ public:
         wet.reset (rate, 0.010);
         wet.setCurrentAndTargetValue (enabled ? 1.0f : 0.0f);
         maxBlock = juce::jmax (1, size);
+        processingWet = enabled;
     }
 
     void reset() { convolution.reset(); }
@@ -167,7 +168,13 @@ public:
         submitPending();
         wet.setTargetValue (enabled ? 1.0f : 0.0f);
         if (!enabled && !wet.isSmoothing())
+        {
+            if (processingWet)
+                convolution.reset();
+            processingWet = false;
             return;
+        }
+        processingWet = true;
 
         auto block = juce::dsp::AudioBlock<float> (buffer);
         for (size_t start = 0; start < block.getNumSamples(); start += static_cast<size_t> (maxBlock))
@@ -198,7 +205,7 @@ public:
     }
 
 private:
-    static constexpr int maxFileBytes = 2 * 1024 * 1024;
+    static constexpr int maxFileBytes = 4 * 1024 * 1024;
 
     struct Impulse
     {
@@ -227,4 +234,5 @@ private:
     juce::AudioBuffer<float> dry;
     juce::SmoothedValue<float> wet;
     int maxBlock = 1;
+    bool processingWet = false;
 };

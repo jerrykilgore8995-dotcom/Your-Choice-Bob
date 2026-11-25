@@ -2,34 +2,8 @@
 #include <JuceHeader.h>
 #include <array>
 
-/*
-    Lead85DSP.h
-    -----------
-    Full high-gain tube-preamp model following the signal-flow of the
-    schematic you provided:
-
-      IN -> V1A (preamp 1)
-          -> FMV tone stack (Treble + Pull Bright / Middle / Bass + Pull Shift)
-          -> V1B (preamp 2)
-          -> [PULL GAIN] V2A -> V2B extra gain cascade
-          -> Volume 1 (master-level, with Pull Bright)
-          -> [RHYTHM] direct   OR   [LEAD] V4A -> V3B lead cascade
-          -> Lead Master
-          -> [GEQ ON/OFF]  5-band graphic EQ (80 / 240 / 750 / 2200 / 6600 Hz)
-          -> V5 phase inverter
-          -> V6/V7 push-pull power section (Class A or Simul-Class)
-          -> Presence (negative-feedback HF)
-          -> Output Transformer (LF/HF rolloff + core saturation)
-      -> OUT
-
-    Reverb path (parallel):
-      post-V2B tap -> V3A reverb driver -> spring tank model -> V4 return
-
-    All ten gain stages (V1A, V1B, V2A, V2B, V3A, V4, V4A, V3B, V5, V6, V7)
-    are implemented as independent TubeTriode / TubePower instances with
-    their own grid-coupling HPF, miller-cap LPF, bias point and
-    asymmetric-triode soft-clip curve.  Nothing is a stub.
-*/
+// Dempwolf-style triode stages, tone controls, spring model and push-pull
+// power section. The cabinet convolution runs at the host rate after the amp.
 namespace lead85
 {
     //--------------------------------------------------------------------------
@@ -319,11 +293,11 @@ namespace lead85
         void prepare (double sr)
         {
             sampleRate = sr;
+            update();
             for (auto& f : { &treble[0], &treble[1], &middle[0], &middle[1],
                              &bass[0],   &bass[1],   &bright[0], &bright[1],
                              &shift[0],  &shift[1] })
                 f->reset();
-            update();
         }
         void reset()
         {
@@ -396,10 +370,9 @@ namespace lead85
         void prepare (double sr)
         {
             sampleRate = sr;
-            for (int c = 0; c < 2; ++c)
-                for (int i = 0; i < 5; ++i) bands[c][i].reset();
             for (int i = 0; i < 5; ++i) gainDb[i] = 0.0f;
             update();
+            reset();
         }
         void reset()
         {
@@ -531,7 +504,7 @@ namespace lead85
         using Coeffs = juce::dsp::IIR::ArrayCoefficients<float>;
         using Filter = juce::dsp::IIR::Filter<float>;
 
-        void prepare (double sr) { sampleRate = sr; for (auto& f : filt) f.reset(); set (0.0f); }
+        void prepare (double sr) { sampleRate = sr; set (0.0f); reset(); }
         void reset() { for (auto& f : filt) f.reset(); }
 
         void set (float db)

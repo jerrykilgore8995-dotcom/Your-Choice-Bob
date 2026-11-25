@@ -9,7 +9,7 @@ The four factory WAVs are guitar cabinet captures by Jester Dyne Productions. Th
 | Greenback / SM57 | 1 – Nacho Guacamole | [Emerald IR Pack](https://www.jester-dyne-productions.com/emerald-ir-pack/) |
 | Greenback / e606 | 4 – Pesto Paladin | [Emerald IR Pack](https://www.jester-dyne-productions.com/emerald-ir-pack/) |
 
-Use **Load WAV...** to load a mono or stereo cabinet response up to one second and under 2 MB. The plug-in resamples at the host rate, matches gain across seven guitar midrange frequencies, preserves IR timing and stereo balance, and embeds the WAV in the session. **CAB** bypasses the speaker stage for an external cabinet processor.
+Use **Load WAV...** to load a mono or stereo cabinet response up to two seconds and under 4 MB. The plug-in resamples at the host rate, matches gain across seven guitar midrange frequencies, preserves IR timing and stereo balance, and embeds the WAV in the session. **CAB** bypasses the speaker stage for an external cabinet processor.
 
 ## More free responses
 
