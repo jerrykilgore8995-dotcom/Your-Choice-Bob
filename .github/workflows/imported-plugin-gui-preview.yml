@@ -1,0 +1,31 @@
+name: FETLimiter74 and Lead85MKII editor screenshots
+
+on:
+  push:
+    branches: [fet74-lead85-gui-preview]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure the editor renderer
+        run: cmake -S imported/gui-preview -B build -G "Visual Studio 17 2022" -A x64
+      - name: Compile the shipping JUCE editors
+        run: cmake --build build --config Release --target EmergentGuiPreview --parallel 3
+      - name: Render both actual editors
+        run: |
+          & ./build/EmergentGuiPreview_artefacts/Release/EmergentGuiPreview.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Emergent-Windows-Editor-Screenshots
+          path: |
+            FETLimiter74-GUI.png
+            Lead85MKII-GUI.png
+          if-no-files-found: error
