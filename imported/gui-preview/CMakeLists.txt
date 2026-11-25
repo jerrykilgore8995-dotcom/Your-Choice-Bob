@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(EmergentGuiPreview LANGUAGES C CXX)
+project(EmergentGuiPreview VERSION 1.0.0 LANGUAGES C CXX)
 
 # Use the same JUCE dependency and source paths as the VST3 build.
 add_subdirectory(.. imported-plugins)
